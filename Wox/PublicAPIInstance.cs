@@ -1,16 +1,12 @@
-﻿using NHotkey;
-using NHotkey.Wpf;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
-using System.Windows.Threading;
+using NHotkey;
+using NHotkey.Wpf;
 using Wox.Core.Plugin;
 using Wox.Core.Resource;
 using Wox.Core.UserSettings;
@@ -41,16 +37,12 @@ namespace Wox
 
                 if(e.KeyEventArgs.Key == Key.Back)
                 {
-                    if (null != BackKeyDownEvent)
+                    BackKeyDownEvent?.Invoke(new WoxKeyDownEventArgs
                     {
-                        BackKeyDownEvent(new WoxKeyDownEventArgs
-                        {
-                            Query = MainVM.QueryText,
-                            keyEventArgs = e.KeyEventArgs
-                        });
-                    }
+                        Query = MainVM.QueryText,
+                        keyEventArgs = e.KeyEventArgs
+                    });
                 }
-
             };
         }
 
@@ -71,14 +63,13 @@ namespace Wox
         public void ChangeQuery(string query, bool requery = false)
         {
             MainVM.QueryText = query;
-            MainVM.CaretIndex = MainVM.QueryText.Length;
-
+            MainVM.OnCursorMovedToEnd();
         }
 
         public void ChangeQueryText(string query, bool selectAll = false)
         {
             MainVM.QueryText = query;
-            MainVM.SelectAllText = true;
+            MainVM.OnTextBoxSelected();
         }
 
         public void CloseApp()
@@ -208,7 +199,7 @@ namespace Wox
         {
             UserSettingStorage.Instance.IncreaseActivateTimes();
             MainVM.MainWindowVisibility = Visibility.Visible;
-            MainVM.SelectAllText = true;
+            MainVM.OnTextBoxSelected();
         }
 
         public void SetHotkey(string hotkeyStr, EventHandler<HotkeyEventArgs> action)

@@ -4,8 +4,6 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using Wox.Core.UserSettings;
 using Wox.Plugin;
@@ -37,23 +35,23 @@ namespace Wox.ViewModel
             }
             set
             {
-                if (null != value)
+                if (value != null)
                 {
-                    if (null != _selectedResult)
+                    if (_selectedResult != null)
                     {
                         _selectedResult.IsSelected = false;
                     }
 
                     _selectedResult = value;
 
-                    if (null != _selectedResult)
+                    if (_selectedResult != null)
                     {
                         _selectedResult.IsSelected = true;
                     }
 
                 }
 
-                OnPropertyChanged("SelectedResult");
+                OnPropertyChanged();
 
             }
         }
@@ -67,7 +65,7 @@ namespace Wox.ViewModel
             set
             {
                 _margin = value;
-                OnPropertyChanged("Margin");
+                OnPropertyChanged();
             }
         }
 
@@ -108,7 +106,7 @@ namespace Wox.ViewModel
 
         public void SelectNextResult()
         {
-            if (null != SelectedResult)
+            if (SelectedResult != null)
             {
                 var index = Results.IndexOf(SelectedResult);
                 if (index == Results.Count - 1)
@@ -121,7 +119,7 @@ namespace Wox.ViewModel
 
         public void SelectPrevResult()
         {
-            if (null != SelectedResult)
+            if (SelectedResult != null)
             {
                 var index = Results.IndexOf(SelectedResult);
                 if (index == 0)
@@ -135,7 +133,7 @@ namespace Wox.ViewModel
         public void SelectNextPage()
         {
             var index = 0;
-            if (null != SelectedResult)
+            if (SelectedResult != null)
             {
                 index = Results.IndexOf(SelectedResult);
             }
@@ -150,7 +148,7 @@ namespace Wox.ViewModel
         public void SelectPrevPage()
         {
             var index = 0;
-            if (null != SelectedResult)
+            if (SelectedResult != null)
             {
                 index = Results.IndexOf(SelectedResult);
             }

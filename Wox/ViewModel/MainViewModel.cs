@@ -1,20 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Forms;
 using System.Windows.Input;
 using Wox.Core.Plugin;
 using Wox.Core.Resource;
-using Wox.Core.UserSettings;
 using Wox.Helper;
 using Wox.Infrastructure;
-using Wox.Infrastructure.Hotkey;
 using Wox.Plugin;
 using Wox.Storage;
+using Stopwatch = Wox.Infrastructure.Stopwatch;
 
 namespace Wox.ViewModel
 {
@@ -25,8 +22,6 @@ namespace Wox.ViewModel
         private string _queryText;
 
         private bool _isProgressBarTooltipVisible;
-        private bool _selectAllText;
-        private int _caretIndex;
         private double _left;
         private double _top;
 
@@ -38,7 +33,7 @@ namespace Wox.ViewModel
         private bool _queryHasReturn;
         private Query _lastQuery = new Query();
         private bool _ignoreTextChange;
-        private List<Result> CurrentContextMenus = new List<Result>();
+        private List<Result> _currentContextMenus = new List<Result>();
         private string _textBeforeEnterContextMenuMode;
 
         #endregion
@@ -71,35 +66,8 @@ namespace Wox.ViewModel
             set
             {
                 _queryText = value;
-                OnPropertyChanged("QueryText");
-
+                OnPropertyChanged();
                 HandleQueryTextUpdated();
-            }
-        }
-
-        public bool SelectAllText
-        {
-            get
-            {
-                return _selectAllText;
-            }
-            set
-            {
-                _selectAllText = value;
-                OnPropertyChanged("SelectAllText");
-            }
-        }
-
-        public int CaretIndex
-        {
-            get
-            {
-                return _caretIndex;
-            }
-            set
-            {
-                _caretIndex = value;
-                OnPropertyChanged("CaretIndex");
             }
         }
 
@@ -112,7 +80,7 @@ namespace Wox.ViewModel
             set
             {
                 _isProgressBarTooltipVisible = value;
-                OnPropertyChanged("IsProgressBarTooltipVisible");
+                OnPropertyChanged();
             }
         }
 
@@ -125,7 +93,7 @@ namespace Wox.ViewModel
             set
             {
                 _left = value;
-                OnPropertyChanged("Left");
+                OnPropertyChanged();
             }
         }
 
@@ -138,7 +106,7 @@ namespace Wox.ViewModel
             set
             {
                 _top = value;
-                OnPropertyChanged("Top");
+                OnPropertyChanged();
             }
         }
 
@@ -151,7 +119,7 @@ namespace Wox.ViewModel
             set
             {
                 _contextMenuVisibility = value;
-                OnPropertyChanged("ContextMenuVisibility");
+                OnPropertyChanged();
             }
         }
 
@@ -164,7 +132,7 @@ namespace Wox.ViewModel
             set
             {
                 _progressBarVisibility = value;
-                OnPropertyChanged("ProgressBarVisibility");
+                OnPropertyChanged();
             }
         }
 
@@ -177,7 +145,7 @@ namespace Wox.ViewModel
             set
             {
                 _resultListBoxVisibility = value;
-                OnPropertyChanged("ResultListBoxVisibility");
+                OnPropertyChanged();
             }
         }
 
@@ -190,7 +158,8 @@ namespace Wox.ViewModel
             set
             {
                 _mainWindowVisibility = value;
-                OnPropertyChanged("MainWindowVisibility");
+                OnPropertyChanged();
+                MainWindowVisibilityChanged?.Invoke(this, new EventArgs());
 
                 if (!value.IsVisible() && ContextMenuVisibility.IsVisible())
                 {
@@ -217,9 +186,8 @@ namespace Wox.ViewModel
 
         private void InitializeKeyCommands()
         {
-            EscCommand = new RelayCommand((parameter) =>
+            EscCommand = new RelayCommand(_ =>
             {
-
                 if (ContextMenuVisibility.IsVisible())
                 {
                     BackToSearchMode();
@@ -228,12 +196,10 @@ namespace Wox.ViewModel
                 {
                     MainWindowVisibility = Visibility.Collapsed;
                 }
-
             });
 
-            SelectNextItemCommand = new RelayCommand((parameter) =>
+            SelectNextItemCommand = new RelayCommand(_ =>
             {
-
                 if (ContextMenuVisibility.IsVisible())
                 {
                     ContextMenu.SelectNextResult();
@@ -242,12 +208,10 @@ namespace Wox.ViewModel
                 {
                     Results.SelectNextResult();
                 }
-
             });
 
-            SelectPrevItemCommand = new RelayCommand((parameter) =>
+            SelectPrevItemCommand = new RelayCommand(_ =>
             {
-
                 if (ContextMenuVisibility.IsVisible())
                 {
                     ContextMenu.SelectPrevResult();
@@ -256,12 +220,10 @@ namespace Wox.ViewModel
                 {
                     Results.SelectPrevResult();
                 }
-
             });
 
-            CtrlOCommand = new RelayCommand((parameter) =>
+            CtrlOCommand = new RelayCommand(_ =>
             {
-
                 if (ContextMenuVisibility.IsVisible())
                 {
                     BackToSearchMode();
@@ -272,73 +234,54 @@ namespace Wox.ViewModel
                 }
             });
 
-            DisplayNextQueryCommand = new RelayCommand((parameter) =>
+            DisplayNextQueryCommand = new RelayCommand(_ =>
             {
-
                 var nextQuery = QueryHistoryStorage.Instance.Next();
                 DisplayQueryHistory(nextQuery);
-
             });
 
-            DisplayPrevQueryCommand = new RelayCommand((parameter) =>
+            DisplayPrevQueryCommand = new RelayCommand(_ =>
             {
-
                 var prev = QueryHistoryStorage.Instance.Previous();
                 DisplayQueryHistory(prev);
-
             });
 
-            SelectNextPageCommand = new RelayCommand((parameter) =>
+            SelectNextPageCommand = new RelayCommand(_ =>
             {
-
                 Results.SelectNextPage();
-
             });
 
-            SelectPrevPageCommand = new RelayCommand((parameter) =>
+            SelectPrevPageCommand = new RelayCommand(_ =>
             {
-
                 Results.SelectPrevPage();
-
             });
 
-            StartHelpCommand = new RelayCommand((parameter) =>
+            StartHelpCommand = new RelayCommand(_ =>
             {
                 Process.Start("http://doc.getwox.com");
             });
 
-            ShiftEnterCommand = new RelayCommand((parameter) =>
+            ShiftEnterCommand = new RelayCommand(_ =>
             {
-
                 if (!ContextMenuVisibility.IsVisible() && null != Results.SelectedResult)
                 {
                     ShowContextMenu(Results.SelectedResult.RawResult);
                 }
-
             });
 
-            OpenResultCommand = new RelayCommand((parameter) =>
+            OpenResultCommand = new RelayCommand(o =>
             {
-
-                if (null != parameter)
+                if (o != null)
                 {
-                    var index = int.Parse(parameter.ToString());
+                    var index = int.Parse(o.ToString());
                     Results.SelectResult(index);
                 }
-
-                if (null != Results.SelectedResult)
-                {
-                    Results.SelectedResult.OpenResultListBoxItemCommand.Execute(null);
-                }
+                Results.SelectedResult?.OpenResultListBoxItemCommand.Execute(null);
             });
 
-            BackCommand = new RelayCommand((parameter) =>
+            BackCommand = new RelayCommand(_ =>
             {
-                if (null != ListeningKeyPressed)
-                {
-                    ListeningKeyPressed(this, new ListeningKeyPressedEventArgs(parameter as System.Windows.Input.KeyEventArgs));
-                }
-
+                ListeningKeyPressed?.Invoke(this, new ListeningKeyPressedEventArgs(_ as KeyEventArgs));
             });
         }
 
@@ -374,7 +317,7 @@ namespace Wox.ViewModel
 
             ContextMenu.Clear();
             ContextMenu.AddResults(actions, pluginID);
-            CurrentContextMenus = actions;
+            _currentContextMenus = actions;
 
             ContextMenuVisibility = Visibility.Visible;
             ResultListBoxVisibility = Visibility.Collapsed;
@@ -392,7 +335,7 @@ namespace Wox.ViewModel
                     Action = _ =>
                     {
                         TopMostRecordStorage.Instance.Remove(result);
-                        App.API.ShowMsg("Succeed", "", "");
+                        App.API.ShowMsg("Succeed");
                         return false;
                     }
                 };
@@ -405,7 +348,7 @@ namespace Wox.ViewModel
                     Action = _ =>
                     {
                         TopMostRecordStorage.Instance.AddOrUpdate(result);
-                        App.API.ShowMsg("Succeed", "", "");
+                        App.API.ShowMsg("Succeed");
                         return false;
                     }
                 };
@@ -420,7 +363,11 @@ namespace Wox.ViewModel
 
         private void HandleQueryTextUpdated()
         {
-            if (_ignoreTextChange) { _ignoreTextChange = false; return; }
+            if (_ignoreTextChange)
+            {
+                _ignoreTextChange = false;
+                return;
+            }
 
             IsProgressBarTooltipVisible = false;
             if (ContextMenuVisibility.IsVisible())
@@ -450,12 +397,12 @@ namespace Wox.ViewModel
             var query = QueryText.ToLower();
             if (string.IsNullOrEmpty(query))
             {
-                ContextMenu.AddResults(CurrentContextMenus, contextMenuId);
+                ContextMenu.AddResults(_currentContextMenus, contextMenuId);
             }
             else
             {
                 List<Result> filterResults = new List<Result>();
-                foreach (Result contextMenu in CurrentContextMenus)
+                foreach (Result contextMenu in _currentContextMenus)
                 {
                     if (StringMatcher.IsMatch(contextMenu.Title, query)
                         || StringMatcher.IsMatch(contextMenu.SubTitle, query))
@@ -496,24 +443,15 @@ namespace Wox.ViewModel
                 }
                 _lastQuery = query;
 
-                Action action = new Action(async () =>
+                Action action = async () =>
                 {
                     await Task.Delay(150);
                     if (!string.IsNullOrEmpty(query.RawQuery) && query.RawQuery == _lastQuery.RawQuery && !_queryHasReturn)
                     {
                         IsProgressBarTooltipVisible = true;
                     }
-                });
+                };
                 action.Invoke();
-
-                //Application.Current.Dispatcher.InvokeAsync(async () =>
-                //{
-                //    await Task.Delay(150);
-                //    if (!string.IsNullOrEmpty(query.RawQuery) && query.RawQuery == _lastQuery.RawQuery && !_queryHasReturn)
-                //    {
-                //        StartProgress();
-                //    }
-                //});
                 PluginManager.QueryForAllPlugins(query);
             }
 
@@ -528,7 +466,7 @@ namespace Wox.ViewModel
 
         private void UpdateResultViewInternal(List<Result> list, PluginMetadata metadata)
         {
-            Infrastructure.Stopwatch.Normal($"UI update cost for {metadata.Name}",
+            Stopwatch.Normal($"UI update cost for {metadata.Name}",
                     () => { Results.AddResults(list, metadata.ID); });
         }
 
@@ -537,7 +475,7 @@ namespace Wox.ViewModel
             QueryText = _textBeforeEnterContextMenuMode;
             ContextMenuVisibility = Visibility.Collapsed;
             ResultListBoxVisibility = Visibility.Visible;
-            CaretIndex = QueryText.Length;
+            OnCursorMovedToEnd();
         }
 
         private void DisplayQueryHistory(HistoryItem history)
@@ -547,7 +485,7 @@ namespace Wox.ViewModel
                 var historyMetadata = QueryHistoryStorage.MetaData;
 
                 QueryText = history.Query;
-                SelectAllText = true;
+                OnTextBoxSelected();
 
                 var executeQueryHistoryTitle = InternationalizationManager.Instance.GetTranslation("executeQuery");
                 var lastExecuteTime = InternationalizationManager.Instance.GetTranslation("lastExecuteTime");
@@ -561,10 +499,8 @@ namespace Wox.ViewModel
                         IcoPath = "Images\\history.png",
                         PluginDirectory = WoxDirectroy.Executable,
                         Action = _ =>{
-
                             QueryText = history.Query;
-                            SelectAllText = true;
-
+                            OnTextBoxSelected();
                             return false;
                         }
                     }
@@ -587,7 +523,7 @@ namespace Wox.ViewModel
             });
             if (originQuery.RawQuery == _lastQuery.RawQuery)
             {
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                Application.Current.Dispatcher.Invoke(() =>
                 {
                     UpdateResultViewInternal(list, metadata);
                 });
@@ -607,19 +543,32 @@ namespace Wox.ViewModel
         #endregion
 
         public event EventHandler<ListeningKeyPressedEventArgs> ListeningKeyPressed;
+        public event EventHandler MainWindowVisibilityChanged;
+
+        public event EventHandler CursorMovedToEnd;
+        public void OnCursorMovedToEnd()
+        {
+            CursorMovedToEnd?.Invoke(this, new EventArgs());
+        }
+
+        public event EventHandler TextBoxSelected;
+        public void OnTextBoxSelected()
+        {
+            TextBoxSelected?.Invoke(this, new EventArgs());
+        }
 
     }
 
     public class ListeningKeyPressedEventArgs : EventArgs
     {
 
-        public System.Windows.Input.KeyEventArgs KeyEventArgs
+        public KeyEventArgs KeyEventArgs
         {
             get;
             private set;
         }
 
-        public ListeningKeyPressedEventArgs(System.Windows.Input.KeyEventArgs keyEventArgs)
+        public ListeningKeyPressedEventArgs(KeyEventArgs keyEventArgs)
         {
             KeyEventArgs = keyEventArgs;
         }
